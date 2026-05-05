@@ -1,0 +1,181 @@
+% This is a collection of 10 problems from problem modules 1, 2, and 3. 2 from each of the modules, then more from any of them.
+
+%  1: Module 1, Project 3
+% Time vector
+t = 0:0.2:20;
+
+% Speed function
+v = -0.2*(t - 10).^2 + 20;
+
+% Plot speed vs time
+figure;
+plot(t, v, 'LineWidth', 2);
+xlabel('Time (s)');
+ylabel('Speed (m/s)');
+title('Speed vs Time');
+grid on;
+% Numerical acceleration (forward difference)
+dt = 0.2;
+a = diff(v) / dt;
+
+% Time points for acceleration (between samples)
+t_a = t(1:end-1) + dt/2;
+
+% Plot acceleration vs time
+figure;
+plot(t_a, a, 'LineWidth', 2);
+xlabel('Time (s)');
+ylabel('Acceleration (m/s^2)');
+title('Acceleration vs Time (Numerical Estimate)');
+grid on;
+[~, idx] = max(v);
+t_max = t(idx)
+v_max = v(idx)
+% Around t = 10, a(t) will be close to 0. 
+% Speed increases before the vertex and decreases after the vertex. Positive and negative acceleration apply here as well.
+
+%  2. Module 1, Project 7
+%% 1. Define brightness model in vertex form
+B = @(x, k, h, Bmax) -k*(x - h).^2 + Bmax;
+
+%% 2. Create two streetlight models
+k1 = 0.02;   h1 = -5;   Bmax1 = 10;   % Streetlight 1
+k2 = 0.015;  h2 =  6;   Bmax2 = 12;   % Streetlight 2
+
+%% 3. Evaluate on x = -20 : 0.5 : 20
+x = -20:0.5:20;
+B1 = B(x, k1, h1, Bmax1);
+B2 = B(x, k2, h2, Bmax2);
+
+%% Plot both curves
+figure; hold on;
+plot(x, B1, 'LineWidth', 2)
+plot(x, B2, 'LineWidth', 2)
+xlabel('x position')
+ylabel('Brightness')
+title('Streetlight Brightness Models')
+legend('Streetlight 1','Streetlight 2')
+grid on
+
+%% 4. Identify maxima
+[max1, idx1] = max(B1);
+[max2, idx2] = max(B2);
+xmax1 = x(idx1);
+xmax2 = x(idx2);
+
+fprintf('Streetlight 1 max brightness = %.2f at x = %.2f\n', max1, xmax1);
+fprintf('Streetlight 2 max brightness = %.2f at x = %.2f\n', max2, xmax2);
+
+%% 5. Find approximate intersection (equal brightness)
+diffB = abs(B1 - B2);
+[~, idxIntersect] = min(diffB);
+xIntersect = x(idxIntersect);
+fprintf('Brightness curves intersect approximately at x = %.2f\n', xIntersect);
+
+%  3. Module 2, Project
+
+%  4. Module 2, Project
+
+%  5. Module 3, Project
+
+%  6. Module 3, Project
+
+%  7. Module 1, Project 5
+% Calibration results
+m1 = 2;  b1 = 2;
+m2 = 1.6; b2 = 7;
+
+% 2. Evaluate models
+x = 0:1:30;
+y1 = m1*x + b1;
+y2 = m2*x + b2;
+
+% 3. Plot both outputs
+figure;
+plot(x, y1, 'LineWidth', 2); hold on;
+plot(x, y2, 'LineWidth', 2);
+xlabel('x'); ylabel('Sensor Output');
+title('Sensor Outputs y1 and y2');
+legend('Sensor 1','Sensor 2');
+grid on;
+
+% 4. Compute and plot error
+e = y1 - y2;
+
+figure;
+plot(x, e, 'LineWidth', 2);
+xlabel('x'); ylabel('Error e(x) = y1 - y2');
+title('Sensor Difference');
+grid on;
+
+% 5. Find x where sensors agree best
+[~, idx] = min(abs(e));
+x_best = x(idx);
+
+fprintf('Sensors agree best at x = %d\n', x_best);
+% For the sensors to agree, the outputs are as close as possible, i.e. both sensors estimate the same true quantity with minimal disagreement.
+% Disagreement can be caused by divergence if slope is changed, and a constant offset if the sensors are changed.
+
+%  8. Module 1, Project 8
+m = 0.5;   % slope (time per distance)
+b = 5;     % intercept (handling time)
+d = 0:40;          % distances
+T = m*d + b;       % time values
+labels = strings(size(d));
+
+labels(d <= 10) = "short";
+labels(d > 10 & d <= 25) = "medium";
+labels(d > 25) = "long";
+
+results = table(d', T', labels', ...
+    'VariableNames', {'Distance', 'Time', 'Interpretation'});
+disp(results)
+figure
+plot(d, T, 'LineWidth', 2)
+xlabel('Distance')
+ylabel('Time')
+title('Time vs Distance')
+grid on
+
+%  9. Module 1, Project 11
+% 1. Define x and Q(x)
+x = 0:0.5:20;
+Q = -0.05*x.^2 + 1.2*x + 5;
+
+% 2. Define threshold T(x)
+T = 0.8*x + 3;
+
+% 3. Plot both
+figure; hold on;
+plot(x, Q, 'b-', 'LineWidth', 2);
+plot(x, T, 'r--', 'LineWidth', 2);
+xlabel('x'); ylabel('Value');
+legend('Q(x)', 'T(x)', 'Location', 'Best');
+grid on;
+
+% 4. Find pass/fail intervals
+pass_idx = find(Q >= T);
+
+% Convert indices to contiguous x-intervals
+d = diff(pass_idx);
+breaks = [0 find(d > 1) length(pass_idx)];
+intervals = [];
+
+for k = 1:length(breaks)-1
+    start_i = pass_idx(breaks(k)+1);
+    end_i   = pass_idx(breaks(k+1));
+    intervals = [intervals; x(start_i) x(end_i)];
+end
+
+disp('Pass intervals (x ranges):');
+disp(intervals);
+Pass intervals (x ranges):
+    0    6.5
+   15   20
+% The quadratic quality metric Q(x) initially rises, peaks, and then declines as x increases. 
+% The linear threshold T(x) grows steadily, eventually intersecting Q(x) at one or two points depending on the model. 
+% Wherever Q(x) stays above T(x), the system is considered to pass. 
+% These pass regions appear as continuous x‑intervals extracted from the inequality Q(x) ≥ T(x). 
+% Plotting both curves makes the intersection behavior and pass/fail regions visually clear.
+
+%  10. Module
