@@ -72,13 +72,143 @@ diffB = abs(B1 - B2);
 xIntersect = x(idxIntersect);
 fprintf('Brightness curves intersect approximately at x = %.2f\n', xIntersect);
 
-%  3. Module 2, Project
+%  3. Module 2, Project 1
+% Stopping Distance Simulation
+clear; clc;
 
-%  4. Module 2, Project
+% --- Tunable Parameter ---
+brakeForce = 6000;     % N (adjust this to see effect on stopping distance)
+
+% Vehicle parameters
+mass = 1200;           % kg
+dt = 0.01;             % time step (s)
+
+% Initial speeds to compare (m/s)
+v0_list = [10 20 30];  % ~22, 45, 67 mph
+
+% Storage
+stoppingDistances = zeros(size(v0_list));
+
+figure; hold on;
+
+for i = 1:length(v0_list)
+    v = v0_list(i);
+    x = 0;
+    
+    while v > 0
+        a = -brakeForce / mass;   % constant deceleration
+        v = v + a*dt;
+        v = max(v,0);             % prevent negative speed
+        x = x + v*dt;
+    end
+    
+    stoppingDistances(i) = x;
+    
+    % Plot bar for each speed
+    bar(i, x); 
+end
+
+set(gca,'XTick',1:length(v0_list),'XTickLabel',v0_list);
+xlabel('Initial Speed (m/s)');
+ylabel('Stopping Distance (m)');
+title(['Stopping Distance vs Initial Speed (Brake Force = ' num2str(brakeForce) ' N)']);
+grid on;
+
+
+%  4. Module 2, Project 7
+clear; clc;
+
+% -----------------------------
+% Simulation Parameters
+% -----------------------------
+dt = 0.01;          % time step (s)
+T  = 10;            % total simulation time (s)
+t  = 0:dt:T;
+
+% Motion constraints
+v_max = 1.5;        % max velocity (m/s)
+v_min = -1.5;       % min velocity (reverse)
+a_max = 1.0;        % max acceleration (m/s^2)
+a_min = -1.0;       % min acceleration (m/s^2)
+
+% Desired acceleration profile (example)
+a_cmd = 0.8 * ones(size(t));  
+a_cmd(t > 4 & t <= 7) = -1.2;   % braking phase
+a_cmd(t > 7) = 0.5;             % accelerate again
+
+% State variables
+x = zeros(size(t));   % position
+v = zeros(size(t));   % velocity
+
+% Event logs
+stop_events = [];
+reverse_events = [];
+
+% -----------------------------
+% Simulation Loop
+% -----------------------------
+for k = 2:length(t)
+
+    % 1. Apply acceleration command with limits
+    a = min(max(a_cmd(k), a_min), a_max);
+
+    % 2. Update velocity
+    v(k) = v(k-1) + a * dt;
+
+    % 3. Enforce velocity limits
+    if v(k) > v_max
+        v(k) = v_max;
+    elseif v(k) < v_min
+        v(k) = v_min;
+    end
+
+    % 4. Update position
+    x(k) = x(k-1) + v(k) * dt;
+
+    % -----------------------------
+    % Event Detection
+    % -----------------------------
+    % Detect stopping (velocity crosses zero)
+    if v(k-1) ~= 0 && abs(v(k)) < 1e-4
+        stop_events(end+1) = t(k);
+    end
+
+    % Detect reversing (sign change)
+    if sign(v(k)) ~= sign(v(k-1)) && v(k) ~= 0
+        reverse_events(end+1) = t(k);
+    end
+end
+
+% -----------------------------
+% Plot Results
+% -----------------------------
+figure;
+subplot(2,1,1);
+plot(t, x, 'LineWidth', 2);
+xlabel('Time (s)');
+ylabel('Position (m)');
+title('Robot Position');
+
+subplot(2,1,2);
+plot(t, v, 'LineWidth', 2);
+hold on;
+
+% Mark events
+yline(0,'k--');
+scatter(stop_events, zeros(size(stop_events)), 80, 'r', 'filled');
+scatter(reverse_events, zeros(size(reverse_events)), 80, 'g', 'filled');
+
+xlabel('Time (s)');
+ylabel('Velocity (m/s)');
+title('Velocity with Stop/Reverse Events');
+legend('Velocity','Zero Line','Stops','Reversals');
+grid on;
 
 %  5. Module 3, Project
 
+
 %  6. Module 3, Project
+
 
 %  7. Module 1, Project 5
 % Calibration results
@@ -178,4 +308,77 @@ Pass intervals (x ranges):
 % These pass regions appear as continuous x‑intervals extracted from the inequality Q(x) ≥ T(x). 
 % Plotting both curves makes the intersection behavior and pass/fail regions visually clear.
 
-%  10. Module
+%  10. Module 2, Project 18
+%% CPU Temperature Rise and Throttling Simulation
+
+clear; clc; close all;
+
+% --- Simulation Parameters ---
+dt = 0.1;                 % time step (s)
+t_end = 200;              % total simulation time (s)
+t = 0:dt:t_end;
+
+% Thermal model parameters
+T_ambient = 35;           % ambient temperature (°C)
+T = T_ambient;            % initial CPU temperature
+C = 50;                   % thermal capacitance (J/°C)
+R = 0.5;                  % thermal resistance (°C/W)
+
+% Power model
+P_full = 45;              % CPU power at full load (W)
+P_throttled = 20;         % power when throttled (W)
+
+% Throttling threshold
+T_limit = 85;             % safe temperature limit (°C)
+
+% Data storage
+T_hist = zeros(size(t));
+P_hist = zeros(size(t));
+perf_hist = zeros(size(t));  % relative performance (1 = full speed)
+
+% --- Simulation Loop ---
+throttled = false;
+
+for i = 1:length(t)
+    
+    % Determine power based on throttling
+    if T >= T_limit
+        throttled = true;
+    elseif T < T_limit - 5
+        throttled = false;  % hysteresis to avoid rapid toggling
+    end
+    
+    if throttled
+        P = P_throttled;
+        perf = 0.5;  % assume 50% performance when throttled
+    else
+        P = P_full;
+        perf = 1.0;
+    end
+    
+    % Thermal model: dT/dt = (P - (T - T_ambient)/R) / C
+    dTdt = (P - (T - T_ambient)/R) / C;
+    T = T + dTdt * dt;
+    
+    % Store data
+    T_hist(i) = T;
+    P_hist(i) = P;
+    perf_hist(i) = perf;
+end
+
+%% --- Plot Results ---
+figure;
+subplot(2,1,1);
+plot(t, T_hist, 'LineWidth', 2); hold on;
+yline(T_limit, 'r--', 'Throttling Limit');
+xlabel('Time (s)');
+ylabel('Temperature (°C)');
+title('CPU Temperature Over Time');
+grid on;
+
+subplot(2,1,2);
+plot(t, perf_hist, 'LineWidth', 2);
+xlabel('Time (s)');
+ylabel('Relative Performance');
+title('Performance (1 = Full Speed, 0.5 = Throttled)');
+grid on;
