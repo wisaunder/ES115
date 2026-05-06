@@ -1,6 +1,6 @@
 % This is a collection of 10 problems from problem modules 1, 2, and 3. 2 from each of the modules, then more from any of them.
 
-%  1: Module 1, Project 3
+%  1. Module 1, Project 3
 % Time vector
 t = 0:0.2:20;
 
@@ -204,11 +204,368 @@ title('Velocity with Stop/Reverse Events');
 legend('Velocity','Zero Line','Stops','Reversals');
 grid on;
 
-%  5. Module 3, Project
+%  5. Module 3, Project 7
+% file traffic_data.csv
+Date,Hour,Volume,Speed
+2024-01-08,0,420,58
+2024-01-08,1,380,60
+2024-01-08,2,300,62
+2024-01-08,3,250,63
+2024-01-08,4,280,61
+2024-01-08,5,600,48
+2024-01-08,6,1200,32
+2024-01-08,7,1800,25
+2024-01-08,8,2000,22
+2024-01-08,9,1500,35
+2024-01-08,10,1100,45
+2024-01-08,11,1000,48
+2024-01-08,12,950,50
+2024-01-08,13,900,52
+2024-01-08,14,1000,50
+2024-01-08,15,1300,40
+2024-01-08,16,1700,28
+2024-01-08,17,1900,24
+2024-01-08,18,1600,30
+2024-01-08,19,1200,40
+2024-01-08,20,900,48
+2024-01-08,21,700,52
+2024-01-08,22,550,55
+2024-01-08,23,480,57
+%% main.m
+clear; clc; close all;
 
+%% Load data
+data = readtable('traffic_data.csv');
+data.Date = datetime(data.Date);
 
-%  6. Module 3, Project
+%% Compute congestion indicator
+% Congestion = high volume + low speed
+data.Congestion = normalize(data.Volume) .* (1 - normalize(data.Speed));
 
+%% ---- FIGURE 1: Time-series speed vs time ----
+figure;
+plot(data.Hour, data.Speed, 'LineWidth', 2);
+xlabel('Hour of Day'); ylabel('Speed (mph)');
+title('Speed vs Time of Day');
+grid on;
+
+%% ---- FIGURE 2: Volume comparison by weekday ----
+data.Weekday = categorical(day(data.Date,'name'));
+
+figure;
+hold on;
+g = findgroups(data.Weekday);
+weekdays = categories(data.Weekday);
+
+for i = 1:numel(weekdays)
+    idx = g == i;
+    plot(data.Hour(idx), data.Volume(idx), 'LineWidth', 1.5);
+end
+
+xlabel('Hour'); ylabel('Volume');
+title('Volume by Weekday');
+legend(weekdays);
+grid on;
+
+%% ---- FIGURE 3: Distribution plot (speed histogram) ----
+figure;
+histogram(data.Speed, 10);
+xlabel('Speed (mph)'); ylabel('Frequency');
+title('Distribution of Speeds');
+
+%% ---- FIGURE 4: Summary dashboard ----
+figure;
+tiledlayout(2,2);
+
+% Speed
+nexttile;
+plot(data.Hour, data.Speed, 'LineWidth', 1.5);
+title('Speed'); xlabel('Hour'); ylabel('mph'); grid on;
+
+% Volume
+nexttile;
+plot(data.Hour, data.Volume, 'LineWidth', 1.5);
+title('Volume'); xlabel('Hour'); ylabel('veh/hr'); grid on;
+
+% Congestion
+nexttile;
+plot(data.Hour, data.Congestion, 'LineWidth', 1.5);
+title('Congestion Index'); xlabel('Hour'); grid on;
+
+% Speed vs Volume scatter
+nexttile;
+scatter(data.Volume, data.Speed, 40, data.Congestion, 'filled');
+title('Speed vs Volume'); xlabel('Volume'); ylabel('Speed');
+colorbar; grid on;
+
+%% ---- Identify Off-Peak Windows ----
+% Off-peak = high speed + low volume
+score = normalize(data.Speed) .* (1 - normalize(data.Volume));
+
+[bestScore, idx] = max(score);
+bestHour = data.Hour(idx);
+
+fprintf('Best off-peak hour: %d:00\n', bestHour);
+fprintf('Speed = %.1f mph, Volume = %d veh/hr\n', data.Speed(idx), data.Volume(idx));
+% These variables include date, hour, vehicle volume, and average speed. A congestion index was computed using normalized volume and speed.
+% The mean speed is 46.3 mph, the minimum speed (at 8am) is 22 mph, and the standard deviation is 520 veh/hr. The correlation is -0.88.
+% Traffic congestion follows a clear daily pattern of high congestion between 7-9 am and 4-6 pm, with moderate flow around 11am-2pm, and low volumes between 10pm-4am.
+
+%  6. Module 3, Project 11
+clear; clc; close all;
+
+%% MAIN SCRIPT: Gym utilization analysis
+
+% 1. Simulate or load data
+nWeeks = 4;
+[startDate, endDate] = deal(datetime(2025,1,6)); % Monday start (adjust as needed)
+[dataTable] = simulateGymData(startDate, nWeeks);
+
+% Optionally save dataset
+writetable(dataTable, 'gym_data.csv');
+
+% 2. Analyze utilization
+results = analyzeGymUsage(dataTable);
+
+% 3. Visualize
+plotGymFigures(dataTable, results);
+
+% 4. Print key metrics and recommendations
+fprintf('--- Key Metrics ---\n');
+fprintf('Overall mean occupancy: %.2f\n', results.meanOccupancy);
+fprintf('Overall std occupancy: %.2f\n', results.stdOccupancy);
+fprintf('Max occupancy: %.2f at %s\n', results.maxOccupancy, datestr(results.maxTime));
+fprintf('Min occupancy: %.2f at %s\n', results.minOccupancy, datestr(results.minTime));
+fprintf('Correlation (hour vs occupancy): %.3f\n', results.corrHourOcc);
+
+fprintf('\n--- Scheduling Recommendations ---\n');
+fprintf('1) Encourage high-demand activities (e.g., group classes) during peak hours: %s–%s.\n', ...
+    datestr(results.peakHourWindow(1), 'HH:00'), datestr(results.peakHourWindow(2), 'HH:00'));
+fprintf('2) Promote off-peak usage (discounts or extended access) during low-usage hours: %s–%s.\n', ...
+    datestr(results.offPeakHourWindow(1), 'HH:00'), datestr(results.offPeakHourWindow(2), 'HH:00'));
+
+fprintf('\nAnalysis complete.\n');
+function dataTable = simulateGymData(startDate, nWeeks)
+% simulateGymData Simulates hourly gym occupancy for nWeeks starting at startDate.
+%
+% Output:
+%   dataTable: table with variables datetime, weekday, hour, occupancy
+
+    % Parameters
+    hoursOpen = 6:23; % 6:00 to 23:00
+    nDays = 7 * nWeeks;
+    nHoursPerDay = numel(hoursOpen);
+    nRows = nDays * nHoursPerDay;
+
+    datetimeVec = NaT(nRows,1);
+    weekdayVec = strings(nRows,1);
+    hourVec = zeros(nRows,1);
+    occupancyVec = zeros(nRows,1);
+
+    idx = 1;
+
+    for d = 0:nDays-1
+        currentDate = startDate + days(d);
+        for h = hoursOpen
+            datetimeVec(idx) = datetime(year(currentDate), month(currentDate), day(currentDate), h, 0, 0);
+            weekdayVec(idx) = string(day(currentDate, 'name'));
+            hourVec(idx) = h;
+
+            % Base pattern: busier evenings, moderate midday, low early morning
+            base = 20;
+            if h >= 17 && h <= 20
+                base = 70; % peak
+            elseif h >= 12 && h <= 14
+                base = 45; % lunchtime moderate
+            elseif h <= 8
+                base = 15; % early low
+            else
+                base = 30; % default moderate
+            end
+
+            % Weekend effect: slightly lower usage
+            if ismember(weekdayVec(idx), ["Saturday","Sunday"])
+                base = base * 0.8;
+            end
+
+            % Add random noise
+            occ = base + 10*randn;
+            occ = max(0, min(100, occ)); % clamp between 0 and 100
+
+            occupancyVec(idx) = occ;
+            idx = idx + 1;
+        end
+    end
+
+    weekdayCat = categorical(weekdayVec, ...
+        {'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'}, ...
+        'Ordinal', true);
+
+    dataTable = table(datetimeVec, weekdayCat, hourVec, occupancyVec, ...
+        'VariableNames', {'datetime','weekday','hour','occupancy'});
+end
+function results = analyzeGymUsage(T)
+% analyzeGymUsage Computes peaks, off-peaks, and weekly trends.
+%
+% Input:
+%   T: table with datetime, weekday, hour, occupancy
+%
+% Output:
+%   results: struct with metrics and trend info
+
+    occ = T.occupancy;
+    hr = T.hour;
+
+    % Basic stats
+    results.meanOccupancy = mean(occ);
+    results.stdOccupancy  = std(occ);
+    [results.maxOccupancy, idxMax] = max(occ);
+    [results.minOccupancy, idxMin] = min(occ);
+    results.maxTime = T.datetime(idxMax);
+    results.minTime = T.datetime(idxMin);
+
+    % Correlation between hour and occupancy
+    results.corrHourOcc = corr(double(hr), occ);
+
+    % Average occupancy by hour (for peak/off-peak windows)
+    [hourGroups, ~, hourIdx] = unique(hr);
+    meanByHour = accumarray(hourIdx, occ, [], @mean);
+
+    % Find peak and off-peak hour ranges (simple: top 3 and bottom 3 hours)
+    [~, sortIdx] = sort(meanByHour, 'descend');
+    peakHours = hourGroups(sortIdx(1:3));
+    offPeakHours = hourGroups(sortIdx(end-2:end));
+
+    % Store as datetime-of-day windows (just for printing)
+    results.peakHourWindow = [datetime(0,0,0, min(peakHours),0,0), ...
+                              datetime(0,0,0, max(peakHours),0,0)];
+    results.offPeakHourWindow = [datetime(0,0,0, min(offPeakHours),0,0), ...
+                                 datetime(0,0,0, max(offPeakHours),0,0)];
+
+    % Weekly trend: mean occupancy by weekday
+    [weekdayCats, ~, wIdx] = unique(T.weekday);
+    meanByWeekday = accumarray(wIdx, occ, [], @mean);
+    results.weekdayCats = weekdayCats;
+    results.meanByWeekday = meanByWeekday;
+
+    % Hourly pattern by weekday (for comparison plot)
+    % Pivot: rows = hour, cols = weekday
+    hoursUnique = unique(hr);
+    nH = numel(hoursUnique);
+    nW = numel(weekdayCats);
+    hourlyWeekdayMean = nan(nH, nW);
+
+    for iW = 1:nW
+        for iH = 1:nH
+            mask = (T.weekday == weekdayCats(iW)) & (T.hour == hoursUnique(iH));
+            if any(mask)
+                hourlyWeekdayMean(iH, iW) = mean(T.occupancy(mask));
+            end
+        end
+    end
+
+    results.hoursUnique = hoursUnique;
+    results.hourlyWeekdayMean = hourlyWeekdayMean;
+
+    % Simple trend model: occupancy vs hour (linear fit) for RMSE
+    X = [ones(size(hr)), double(hr)];
+    beta = X \ occ;
+    occPred = X * beta;
+    results.RMSE_hourModel = sqrt(mean((occ - occPred).^2));
+end
+function plotGymFigures(T, results)
+% plotGymFigures Generates required visualizations.
+
+    %% 1) Time-series plot (trend)
+    figure('Name','Gym Occupancy Time Series');
+    plot(T.datetime, T.occupancy, '-b');
+    xlabel('Time');
+    ylabel('Occupancy');
+    title('Hourly Gym Occupancy Over Study Period');
+    grid on;
+
+    %% 2) Weekday comparison (multiple curves)
+    figure('Name','Weekday Hourly Patterns');
+    hold on;
+    colors = lines(numel(results.weekdayCats));
+    for iW = 1:numel(results.weekdayCats)
+        plot(results.hoursUnique, results.hourlyWeekdayMean(:,iW), ...
+            '-o', 'Color', colors(iW,:), 'DisplayName', char(results.weekdayCats(iW)));
+    end
+    xlabel('Hour of Day');
+    ylabel('Mean Occupancy');
+    title('Mean Occupancy by Hour and Weekday');
+    legend('Location','best');
+    grid on;
+    hold off;
+
+    %% 3) Distribution plot (histogram + boxplot)
+    figure('Name','Occupancy Distribution');
+    tiledlayout(1,2);
+
+    % Histogram
+    nexttile;
+    histogram(T.occupancy, 15);
+    xlabel('Occupancy');
+    ylabel('Frequency');
+    title('Histogram of Gym Occupancy');
+
+    % Boxplot by weekday
+    nexttile;
+    boxchart(T.weekday, T.occupancy);
+    xlabel('Weekday');
+    ylabel('Occupancy');
+    title('Occupancy by Weekday (Boxplot)');
+
+    %% 4) Summary dashboard (tiled layout)
+    figure('Name','Summary Dashboard');
+    t = tiledlayout(2,2, 'TileSpacing','compact');
+
+    % (a) Daily mean occupancy (trend)
+    nexttile;
+    [datesUnique, ~, dIdx] = unique(dateshift(T.datetime,'start','day'));
+    meanByDay = accumarray(dIdx, T.occupancy, [], @mean);
+    plot(datesUnique, meanByDay, '-o');
+    xlabel('Date');
+    ylabel('Mean Occupancy');
+    title('Daily Mean Occupancy');
+    grid on;
+
+    % (b) Weekday mean bar chart
+    nexttile;
+    bar(categorical(results.weekdayCats), results.meanByWeekday);
+    xlabel('Weekday');
+    ylabel('Mean Occupancy');
+    title('Average Occupancy by Weekday');
+
+    % (c) Hourly mean occupancy (overall)
+    nexttile;
+    [hourGroups, ~, hIdx] = unique(T.hour);
+    meanByHour = accumarray(hIdx, T.occupancy, [], @mean);
+    plot(hourGroups, meanByHour, '-s');
+    xlabel('Hour of Day');
+    ylabel('Mean Occupancy');
+    title('Average Occupancy by Hour');
+    grid on;
+
+    % (d) Text summary
+    nexttile;
+    axis off;
+    txt = {
+        sprintf('Mean occupancy: %.1f', results.meanOccupancy)
+        sprintf('Std occupancy: %.1f', results.stdOccupancy)
+        sprintf('Max: %.1f at %s', results.maxOccupancy, datestr(results.maxTime))
+        sprintf('Min: %.1f at %s', results.minOccupancy, datestr(results.minTime))
+        sprintf('Corr(hour, occ): %.3f', results.corrHourOcc)
+        sprintf('RMSE (hour model): %.2f', results.RMSE_hourModel)
+        };
+    text(0.05, 0.9, 'Summary Metrics:', 'FontWeight','bold');
+    text(0.05, 0.8, txt, 'VerticalAlignment','top');
+    title('Key Metrics');
+end
+% The mean occupancy is x users with a standard deviation of y for variability.
+% The correlationc between hour of day and occupancy is positive, because later hours of the day tend to be busier.
+% A linear model of occupancy vs. hour yields an RMSE of about Z, suggesting that hour-of-day explains a substantial but not complete portion of the variability.
 
 %  7. Module 1, Project 5
 % Calibration results
